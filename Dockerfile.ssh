@@ -1,0 +1,147 @@
+FROM centos:7
+
+MAINTAINER Josh Hursey <jhursey@us.ibm.com>
+
+# ------------------------------------------------------------
+# Install required packages
+# ------------------------------------------------------------
+RUN yum -y update && \
+    yum -y install \
+    openssh-server openssh-clients \
+    gcc gcc-gfortran gcc-c++ gdb strace \
+    binutils less wget which sudo \
+    perl perl-Data-Dumper \
+    autoconf automake libtool flex bison \
+    iproute net-tools hwloc make git \
+    libnl3 gtk2 atk cairo tcl tcsh tk pciutils lsof ethtool bc file && \
+    yum clean all
+
+# ------------------------------------------------------------
+# Define support libraries
+# - hwloc1
+# - hwloc2
+# - libevent
+# ------------------------------------------------------------
+RUN mkdir -p /opt/mpi/local
+ADD src /opt/mpi/local/src
+
+ARG LIBEVENT_INSTALL_PATH=/opt/mpi/local/libevent
+ENV LIBEVENT_INSTALL_PATH=$LIBEVENT_INSTALL_PATH
+ARG HWLOC1_INSTALL_PATH=/opt/mpi/local/hwloc-1x
+ENV HWLOC1_INSTALL_PATH=$HWLOC1_INSTALL_PATH
+ARG HWLOC_INSTALL_PATH=/opt/mpi/local/hwloc
+ENV HWLOC_INSTALL_PATH=$HWLOC_INSTALL_PATH
+
+RUN cd /opt/mpi/local/src && \
+    tar -zxf libevent* && \
+    cd libevent* && \
+    ./configure --prefix=${LIBEVENT_INSTALL_PATH} > /dev/null && \
+    make > /dev/null && \
+    make install > /dev/null && \
+    cd /opt/mpi/local/src && \
+    tar -zxf hwloc-1* && \
+    cd hwloc-1* && \
+    ./configure --prefix=${HWLOC1_INSTALL_PATH} > /dev/null && \
+    make > /dev/null && \
+    make install > /dev/null && \
+    cd /opt/mpi/local/src && \
+    tar -zxf hwloc-2* && \
+    cd hwloc-2* && \
+    ./configure --prefix=${HWLOC_INSTALL_PATH} > /dev/null && \
+    make > /dev/null && \
+    make install > /dev/null && \
+    cd .. && \
+    rm -rf /opt/mpi/local/src
+
+# ------------------------------------------------------------
+# PMIx Install
+# ------------------------------------------------------------
+ENV PMIX_ROOT=/opt/mpi/local/pmix
+ENV LD_LIBRARY_PATH="$PMIX_ROOT/lib:$HWLOC_INSTALL_PATH/bin:$LIBEVENT_INSTALL_PATH/lib:${LD_LIBRARY_PATH}"
+
+ARG _BUILD_PMIX_VERSION=3.1.4
+ENV _BUILD_PMIX_VERSION=${_BUILD_PMIX_VERSION}
+
+RUN cd /opt/mpi/ && \
+    wget -q https://github.com/pmix/pmix/releases/download/v${_BUILD_PMIX_VERSION}/pmix-${_BUILD_PMIX_VERSION}.tar.gz && \
+    tar -zxf pmix-${_BUILD_PMIX_VERSION}.tar.gz  && \
+    cd pmix-${_BUILD_PMIX_VERSION} && \
+    ./configure --prefix=${PMIX_ROOT} \
+                --with-hwloc=${HWLOC_INSTALL_PATH} \
+                --with-libevent=${LIBEVENT_INSTALL_PATH} 2>&1 | tee configure.log.$$ 2>&1 && \
+    make 2>&1 | tee make.log.$$ 2>&1 && \
+    make install 2>&1 | tee make.install.log.$$ && \
+    cd ..
+
+# ------------------------------------------------------------
+# Open MPI Install
+# ------------------------------------------------------------
+ENV MPI_ROOT=/opt/mpi/local/ompi
+
+ENV PATH="$MPI_ROOT/bin:${PATH}"
+ENV LD_LIBRARY_PATH="$MPI_ROOT/lib:${LD_LIBRARY_PATH}"
+
+ARG _BUILD_OMPI_VERSION=4.0.2
+ENV _BUILD_OMPI_VERSION=${_BUILD_OMPI_VERSION}
+ARG _BUILD_OMPI_BASE_VERSION=4.0
+ENV _BUILD_OMPI_BASE_VERSION=${_BUILD_OMPI_BASE_VERSION}
+
+# Testing a release tarball of OMPI
+RUN cd /opt/mpi/ && \
+    wget -q https://download.open-mpi.org/release/open-mpi/v${_BUILD_OMPI_BASE_VERSION}/openmpi-${_BUILD_OMPI_VERSION}.tar.gz && \
+    tar -zxf openmpi-${_BUILD_OMPI_VERSION}.tar.gz  && \
+    cd openmpi-${_BUILD_OMPI_VERSION} && \
+    ./configure --prefix=${MPI_ROOT} \
+                --with-hwloc=${HWLOC_INSTALL_PATH} \
+                --with-libevent=${LIBEVENT_INSTALL_PATH} \
+                --with-pmix=${PMIX_ROOT} \
+                --enable-mpirun-prefix-by-default 2>&1 | tee configure.log.$$ 2>&1 && \
+    make -j 10   2>&1 | tee make.log.$$ 2>&1 && \
+    make install 2>&1 | tee make.install.log.$$ 2>&1
+
+RUN rm -rf /opt/mpi/openmpi-* /opt/mpi/pmix-*
+
+# ------------------------------------------------------------
+# Copy in an MPI test program
+# ------------------------------------------------------------
+RUN mkdir -p /opt/mpi/examples && chmod og+rwX /opt/mpi/examples && \
+    mkdir -p /opt/mpi/etc && chmod og+rwX /opt/mpi/etc
+COPY tests /opt/mpi/examples
+RUN cd /opt/mpi/examples && make
+
+
+# ------------------------------------------------------------
+# Fixup the ssh login
+# ------------------------------------------------------------
+RUN ssh-keygen -t rsa -f /etc/ssh/ssh_host_rsa_key -N "" && \
+    ssh-keygen -t ecdsa -f /etc/ssh/ssh_host_ecdsa_key  -N "" && \
+    ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key  -N "" && \
+    echo "        LogLevel ERROR" >> /etc/ssh/ssh_config && \
+    echo "        StrictHostKeyChecking no" >> /etc/ssh/ssh_config && \
+    echo "        UserKnownHostsFile=/dev/null" >> /etc/ssh/ssh_config
+
+# ------------------------------------------------------------
+# Create a user account
+# ------------------------------------------------------------
+RUN groupadd -r mpiuser && useradd --no-log-init -r -m -b /home -g mpiuser mpiuser
+USER mpiuser
+RUN  cd /home/mpiuser && \
+        ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa && chmod og+rX . && \
+        cd .ssh && cat id_rsa.pub > authorized_keys && chmod 644 authorized_keys && \
+        exit
+USER root
+ENV OMPI_MCA_orte_default_hostfile=/opt/mpi/etc/hostfile.txt
+# Need to do this so that the 'mpiuser' can have them too, not just root
+RUN echo "export PMIX_ROOT=/opt/mpi/local/pmix" >> /etc/bashrc && \
+    echo "export MPI_ROOT=/opt/mpi/local/ompi" >> /etc/bashrc  && \
+    echo "export PATH=\$MPI_ROOT/bin:\$PATH" >> /etc/bashrc  && \
+    echo "export LD_LIBRARY_PATH=\$MPI_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
+    echo "export LD_LIBRARY_PATH=\$PMIX_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
+    echo "export LD_LIBRARY_PATH=$HWLOC_INSTALL_PATH/bin:$LIBEVENT_INSTALL_PATH/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
+    echo "export OMPI_MCA_orte_default_hostfile=$OMPI_MCA_orte_default_hostfile" >> /etc/bashrc
+
+# ------------------------------------------------------------
+# Kick off the ssh daemon
+# ------------------------------------------------------------
+EXPOSE 22
+CMD ["/usr/sbin/sshd", "-D"]
