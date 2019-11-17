@@ -35,7 +35,7 @@ Successfully tagged ompi-toy-box:latest
 
 This script will:
  * Create a private overlay network between the pods (`docker network create --driver overlay --attachable`)
- * Start N containers each named `$USER-nodeXY` where XY is the node number startig from `0`.
+ * Start N containers each named `$USER-nodeXY` where XY is the node number startig from `01`.
 
 ```
 ./start-n-containers.sh
