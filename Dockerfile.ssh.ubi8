@@ -1,19 +1,24 @@
-FROM centos:7
+FROM registry.redhat.io/ubi8
 
 MAINTAINER Josh Hursey <jhursey@us.ibm.com>
 
 # ------------------------------------------------------------
 # Install required packages
+#    openssh-server openssh-clients \
+#    strace \
+#    flex bison \
+#    iproute net-tools hwloc
+#    libnl3 gtk2 atk cairo tcl tcsh tk pciutils lsof ethtool
 # ------------------------------------------------------------
 RUN yum -y update && \
     yum -y install \
-    openssh-server openssh-clients \
-    gcc gcc-gfortran gcc-c++ gdb strace \
+    gcc gcc-gfortran gcc-c++ gdb \
     binutils less wget which sudo \
     perl perl-Data-Dumper \
-    autoconf automake libtool flex bison \
-    iproute net-tools hwloc make git \
-    libnl3 gtk2 atk cairo tcl tcsh tk pciutils lsof ethtool bc file && \
+    autoconf automake libtool \
+    make git \
+    bc file \
+    diffutils && \
     yum clean all
 
 # ------------------------------------------------------------
@@ -79,7 +84,7 @@ RUN cd /opt/mpi/ && \
 ENV PRRTE_ROOT=/opt/mpi/local/prrte
 RUN cd /opt && mkdir prrte && cd prrte && \
     wget -q https://github.com/openpmix/prrte/releases/download/v1.0.0/prrte-1.0.0.tar.gz && \
-    tar -zxf prrte-* && cd prrte-1.0.0 && \
+    cd prrte-1.0.0 && \
     ./configure --prefix=${PRRTE_ROOT} \
                 --with-hwloc=${HWLOC_INSTALL_PATH} \
                 --with-libevent=${LIBEVENT_INSTALL_PATH} \
@@ -112,6 +117,7 @@ RUN cd /opt/mpi/ && \
                 --enable-mpirun-prefix-by-default 2>&1 | tee configure.log.$$ 2>&1 && \
     make -j 10   2>&1 | tee make.log.$$ 2>&1 && \
     make install 2>&1 | tee make.install.log.$$ 2>&1
+
 
 # ------------------------------------------------------------
 # Cleanup
