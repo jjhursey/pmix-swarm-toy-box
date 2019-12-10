@@ -84,7 +84,7 @@ RUN cd /opt/mpi/ && \
 ENV PRRTE_ROOT=/opt/mpi/local/prrte
 RUN cd /opt && mkdir prrte && cd prrte && \
     wget -q https://github.com/openpmix/prrte/releases/download/v1.0.0/prrte-1.0.0.tar.gz && \
-    cd prrte-1.0.0 && \
+    tar -zxf prrte-* && cd prrte-1.0.0 && \
     ./configure --prefix=${PRRTE_ROOT} \
                 --with-hwloc=${HWLOC_INSTALL_PATH} \
                 --with-libevent=${LIBEVENT_INSTALL_PATH} \
