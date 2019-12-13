@@ -77,9 +77,10 @@ RUN cd /opt/mpi/ && \
 # PRRTE Install
 # ------------------------------------------------------------
 ENV PRRTE_ROOT=/opt/mpi/local/prrte
-RUN cd /opt && mkdir prrte && cd prrte && \
-    wget -q https://github.com/openpmix/prrte/releases/download/v1.0.0/prrte-1.0.0.tar.gz && \
-    tar -zxf prrte-* && cd prrte-1.0.0 && \
+RUN cd /opt && rm -rf prrte && mkdir prrte && cd prrte && \
+    git clone --single-branch -b topic/orte https://github.com/rhc54/prrte prrte-git && \
+    cd prrte-git && \
+    ./autogen.pl && \
     ./configure --prefix=${PRRTE_ROOT} \
                 --with-hwloc=${HWLOC_INSTALL_PATH} \
                 --with-libevent=${LIBEVENT_INSTALL_PATH} \
@@ -147,16 +148,18 @@ RUN  cd /home/mpiuser && \
         cd .ssh && cat id_rsa.pub > authorized_keys && chmod 644 authorized_keys && \
         exit
 USER root
-ENV OMPI_MCA_orte_default_hostfile=/opt/mpi/etc/hostfile.txt
+ENV PRRTE_MCA_prrte_default_hostfile=/opt/mpi/etc/hostfile.txt
 # Need to do this so that the 'mpiuser' can have them too, not just root
 RUN echo "export PMIX_ROOT=/opt/mpi/local/pmix" >> /etc/bashrc && \
     echo "export PRRTE_ROOT=/opt/mpi/local/prrte" >> /etc/bashrc  && \
     echo "export MPI_ROOT=/opt/mpi/local/ompi" >> /etc/bashrc  && \
     echo "export PATH=\$MPI_ROOT/bin:\$PATH" >> /etc/bashrc  && \
+    echo "export PATH=\$PRRTE_ROOT/bin:\$MPI_ROOT/bin:\$PATH" >> /etc/bashrc  && \
     echo "export LD_LIBRARY_PATH=\$MPI_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
     echo "export LD_LIBRARY_PATH=\$PMIX_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
-    echo "export LD_LIBRARY_PATH=$HWLOC_INSTALL_PATH/bin:$LIBEVENT_INSTALL_PATH/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
-    echo "export OMPI_MCA_orte_default_hostfile=$OMPI_MCA_orte_default_hostfile" >> /etc/bashrc
+    echo "export LD_LIBRARY_PATH=$HWLOC_INSTALL_PATH/lib:$LIBEVENT_INSTALL_PATH/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
+    echo "export LD_LIBRARY_PATH=\$PRRTE_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
+    echo "export PRRTE_MCA_prrte_default_hostfile=$PRRTE_MCA_prrte_default_hostfile" >> /etc/bashrc
 
 # ------------------------------------------------------------
 # Kick off the ssh daemon
