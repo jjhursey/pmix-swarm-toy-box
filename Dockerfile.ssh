@@ -1,3 +1,23 @@
+#
+# Base Build box for PRRTE CI
+# Requires:
+#  - Basic compile tooling and runtime support
+#  - libevent
+#  - hwloc 2.x
+# Optional:
+#  - PMIx - built in a location that can be replaced with volume mount
+#    - For now use 'master' branch
+#  - PRRTE - built in a location that can be replaced with volume mount
+#    - For now use 'master' branch
+#  - Open MPI - built in a location that can be replaced with volume mount
+#    - For now use 'master' branch
+#
+# Directory structure for volume mounting
+# - Build directory to mount in the source from the local file system
+#   /opt/hpc/local/build/
+# - Install directory to mount in an installation directory to be shared between containers
+#   /opt/hpc/external/{pmix,prrte,ompi}
+#
 FROM centos:7
 
 MAINTAINER Josh Hursey <jhursey@us.ibm.com>
@@ -13,85 +33,80 @@ RUN yum -y update && \
     perl perl-Data-Dumper \
     autoconf automake libtool flex bison \
     iproute net-tools hwloc make git \
-    libnl3 gtk2 atk cairo tcl tcsh tk pciutils lsof ethtool bc file && \
+    libnl3 gtk2 atk cairo tcl tcsh tk pciutils lsof ethtool bc file \
+    psmisc && \
     yum clean all
 
 # ------------------------------------------------------------
 # Define support libraries
-# - hwloc1
-# - hwloc2
+# - hwloc
 # - libevent
 # ------------------------------------------------------------
-RUN mkdir -p /opt/mpi/local/build
-ADD src /opt/mpi/local/src
+RUN mkdir -p /opt/hpc/local/build
+ADD src /opt/hpc/local/src
 
-ARG LIBEVENT_INSTALL_PATH=/opt/mpi/local/libevent
+ARG LIBEVENT_INSTALL_PATH=/opt/hpc/local/libevent
 ENV LIBEVENT_INSTALL_PATH=$LIBEVENT_INSTALL_PATH
-ARG HWLOC1_INSTALL_PATH=/opt/mpi/local/hwloc-1x
-ENV HWLOC1_INSTALL_PATH=$HWLOC1_INSTALL_PATH
-ARG HWLOC_INSTALL_PATH=/opt/mpi/local/hwloc
+ARG HWLOC_INSTALL_PATH=/opt/hpc/local/hwloc
 ENV HWLOC_INSTALL_PATH=$HWLOC_INSTALL_PATH
 
-RUN cd /opt/mpi/local/build && \
+RUN cd /opt/hpc/local/build && \
     tar -zxf ../src/libevent* && \
     cd libevent-* && \
     ./configure --prefix=${LIBEVENT_INSTALL_PATH} > /dev/null && \
     make > /dev/null && \
     make install > /dev/null
-RUN cd /opt/mpi/local/build && \
-    tar -zxf ../src/hwloc-1* && \
-    cd hwloc-1* && \
-    ./configure --prefix=${HWLOC1_INSTALL_PATH} > /dev/null && \
-    make > /dev/null && \
-    make install > /dev/null
-RUN cd /opt/mpi/local/build && \
+RUN cd /opt/hpc/local/build && \
     tar -zxf ../src/hwloc-2* && \
     cd hwloc-2* && \
     ./configure --prefix=${HWLOC_INSTALL_PATH} > /dev/null && \
     make > /dev/null && \
     make install > /dev/null && \
     cd .. && \
-    rm -rf /opt/mpi/local/src /opt/mpi/local/build
+    rm -rf /opt/hpc/local/src /opt/hpc/local/build/*
+ENV LD_LIBRARY_PATH="$HWLOC_INSTALL_PATH/bin:$LIBEVENT_INSTALL_PATH/lib:${LD_LIBRARY_PATH}"
+
 
 # ------------------------------------------------------------
 # PMIx Install
 # ------------------------------------------------------------
-ENV PMIX_ROOT=/opt/mpi/local/pmix
-ENV LD_LIBRARY_PATH="$PMIX_ROOT/lib:$HWLOC_INSTALL_PATH/bin:$LIBEVENT_INSTALL_PATH/lib:${LD_LIBRARY_PATH}"
+ENV PMIX_ROOT=/opt/hpc/external/pmix
+ENV LD_LIBRARY_PATH="$PMIX_ROOT/lib:${LD_LIBRARY_PATH}"
 
-ARG _BUILD_PMIX_VERSION=3.1.4
-ENV _BUILD_PMIX_VERSION=${_BUILD_PMIX_VERSION}
-
-RUN cd /opt/mpi/ && \
-    wget -q https://github.com/pmix/pmix/releases/download/v${_BUILD_PMIX_VERSION}/pmix-${_BUILD_PMIX_VERSION}.tar.gz && \
-    tar -zxf pmix-${_BUILD_PMIX_VERSION}.tar.gz  && \
-    cd pmix-${_BUILD_PMIX_VERSION} && \
+RUN cd /opt/hpc/local/build && \
+    git clone -q -b master https://github.com/openpmix/openpmix.git && \
+    cd openpmix && \
+    ./autogen.pl && \
     ./configure --prefix=${PMIX_ROOT} \
                 --with-hwloc=${HWLOC_INSTALL_PATH} \
                 --with-libevent=${LIBEVENT_INSTALL_PATH} 2>&1 | tee configure.log.$$ 2>&1 && \
-    make 2>&1 | tee make.log.$$ 2>&1 && \
-    make install 2>&1 | tee make.install.log.$$ && \
-    cd ..
+    make -j 10 2>&1 | tee make.log.$$ 2>&1 && \
+    make -j 10 install 2>&1 | tee make.install.log.$$ && \
+    cd .. && rm -rf /opt/hpc/local/build/*
 
 # ------------------------------------------------------------
 # PRRTE Install
 # ------------------------------------------------------------
-ENV PRRTE_ROOT=/opt/mpi/local/prrte
-RUN cd /opt && rm -rf prrte && mkdir prrte && cd prrte && \
-    git clone --single-branch -b topic/orte https://github.com/rhc54/prrte prrte-git && \
-    cd prrte-git && \
+ENV PRRTE_ROOT=/opt/hpc/external/prrte
+ENV PATH="$PRRTE_ROOT/bin:${PATH}"
+ENV LD_LIBRARY_PATH="$PRRTE_ROOT/lib:${LD_LIBRARY_PATH}"
+
+RUN cd /opt/hpc/local/build && \
+    git clone -q -b master https://github.com/openpmix/prrte.git && \
+    cd prrte && \
     ./autogen.pl && \
     ./configure --prefix=${PRRTE_ROOT} \
                 --with-hwloc=${HWLOC_INSTALL_PATH} \
                 --with-libevent=${LIBEVENT_INSTALL_PATH} \
                 --with-pmix=${PMIX_ROOT} 2>&1 | tee configure.log.$$ 2>&1 && \
     make -j 10 2>&1 | tee make.log.$$ 2>&1 && \
-    make install 2>&1 | tee make.install.log.$$ 2>&1
+    make install 2>&1 | tee make.install.log.$$ 2>&1 && \
+    rm -rf /opt/hpc/local/build/*
 
 # ------------------------------------------------------------
 # Open MPI Install
 # ------------------------------------------------------------
-ENV MPI_ROOT=/opt/mpi/local/ompi
+ENV MPI_ROOT=/opt/hpc/external/ompi
 
 ENV PATH="$MPI_ROOT/bin:${PATH}"
 ENV LD_LIBRARY_PATH="$MPI_ROOT/lib:${LD_LIBRARY_PATH}"
@@ -102,7 +117,7 @@ ARG _BUILD_OMPI_BASE_VERSION=4.0
 ENV _BUILD_OMPI_BASE_VERSION=${_BUILD_OMPI_BASE_VERSION}
 
 # Testing a release tarball of OMPI
-RUN cd /opt/mpi/ && \
+RUN cd /opt/hpc/local/build && \
     wget -q https://download.open-mpi.org/release/open-mpi/v${_BUILD_OMPI_BASE_VERSION}/openmpi-${_BUILD_OMPI_VERSION}.tar.gz && \
     tar -zxf openmpi-${_BUILD_OMPI_VERSION}.tar.gz  && \
     cd openmpi-${_BUILD_OMPI_VERSION} && \
@@ -115,17 +130,18 @@ RUN cd /opt/mpi/ && \
     make install 2>&1 | tee make.install.log.$$ 2>&1
 
 # ------------------------------------------------------------
-# Cleanup
+# Flush but keep the build directory
+# - We will mount in the pmix/prrte/ompi source in there
 # ------------------------------------------------------------
-RUN rm -rf /opt/mpi/openmpi-* /opt/mpi/pmix-* /opt/mpi/prrte-*
+RUN rm -rf /opt/hpc/local/build && mkdir -p /opt/hpc/local/build
 
 # ------------------------------------------------------------
 # Copy in an MPI test program
 # ------------------------------------------------------------
-RUN mkdir -p /opt/mpi/examples && chmod og+rwX /opt/mpi/examples && \
-    mkdir -p /opt/mpi/etc && chmod og+rwX /opt/mpi/etc
-COPY tests /opt/mpi/examples
-RUN cd /opt/mpi/examples && make
+RUN mkdir -p /opt/hpc/examples && chmod og+rwX /opt/hpc/examples && \
+    mkdir -p /opt/hpc/etc && chmod og+rwX /opt/hpc/etc
+COPY tests /opt/hpc/examples
+RUN cd /opt/hpc/examples && make
 
 
 # ------------------------------------------------------------
@@ -154,12 +170,17 @@ RUN  cd /home/mpiuser && \
         ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa && chmod og+rX . && \
         cd .ssh && cat id_rsa.pub > authorized_keys && chmod 644 authorized_keys && \
         exit
+
+# ------------------------------------------------------------
+# Adjust the default environment
+# ------------------------------------------------------------
 USER root
-ENV PRRTE_MCA_prrte_default_hostfile=/opt/mpi/etc/hostfile.txt
+
+ENV PRRTE_MCA_prrte_default_hostfile=/opt/hpc/etc/hostfile.txt
 # Need to do this so that the 'mpiuser' can have them too, not just root
-RUN echo "export PMIX_ROOT=/opt/mpi/local/pmix" >> /etc/bashrc && \
-    echo "export PRRTE_ROOT=/opt/mpi/local/prrte" >> /etc/bashrc  && \
-    echo "export MPI_ROOT=/opt/mpi/local/ompi" >> /etc/bashrc  && \
+RUN echo "export PMIX_ROOT=/opt/hpc/external/pmix" >> /etc/bashrc && \
+    echo "export PRRTE_ROOT=/opt/hpc/external/prrte" >> /etc/bashrc  && \
+    echo "export MPI_ROOT=/opt/hpc/external/ompi" >> /etc/bashrc  && \
     echo "export PATH=\$MPI_ROOT/bin:\$PATH" >> /etc/bashrc  && \
     echo "export PATH=\$PRRTE_ROOT/bin:\$MPI_ROOT/bin:\$PATH" >> /etc/bashrc  && \
     echo "export LD_LIBRARY_PATH=\$MPI_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \

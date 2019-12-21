@@ -6,6 +6,8 @@
 IMAGE_NAME=ompi-toy-box:latest
 OVERLAY_NETWORK=pmix-net
 NNODES=2
+INSTALL_DIR=
+BUILD_DIR=
 
 COMMON_PREFIX=$USER"-"
 
@@ -24,6 +26,8 @@ while [[ $# -gt 0 ]] ; do
     -p | --prefix PREFIX       Prefix string for hostnames (Default: %s)
     -n | --num NUM             Number of nodes to start on this host (Default: %s)
     -i | --image NAME          Name of the container image (Required)
+         --install DIR         Full path to the 'install' directory
+         --build DIR           Full path to the 'build' directory
     -d | --dryrun              Dry run. Do not actually start anything.
     -h | --help                Print this help message\n" \
         `basename $0` $COMMON_PREFIX $NNODES
@@ -40,6 +44,14 @@ while [[ $# -gt 0 ]] ; do
         "-i" | "--image" | "-img")
             shift
             IMAGE_NAME=$1
+            ;;
+        "--install")
+            shift
+            INSTALL_DIR=$1
+            ;;
+        "--build")
+            shift
+            BUILD_DIR=$1
             ;;
         "-d" | "--dryrun")
             DRYRUN=1
@@ -79,9 +91,16 @@ startup_container()
     # Add other volume mounts here
     _OTHER_ARGS=""
 
+    if [ "x" != "x$BUILD_DIR" ] ; then
+        _OTHER_ARGS+=" -v $BUILD_DIR:/opt/hpc/build"
+    fi
+    if [ "x" != "x$INSTALL_DIR" ] ; then
+        _OTHER_ARGS+=" -v $INSTALL_DIR:/opt/hpc/external"
+    fi
+
     CMD="docker run --rm \
         --cap-add=SYS_NICE --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
-        -v $MPI_HOSTFILE:/opt/mpi/etc/hostfile.txt:ro \
+        -v $MPI_HOSTFILE:/opt/hpc/etc/hostfile.txt:ro \
         $_OTHER_ARGS \
         --network $OVERLAY_NETWORK \
         -h $C_HOSTNAME --name $C_HOSTNAME \
