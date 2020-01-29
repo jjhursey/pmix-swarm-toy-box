@@ -67,6 +67,12 @@ RUN cd /opt/hpc/local/build && \
 ENV LD_LIBRARY_PATH="$HWLOC_INSTALL_PATH/bin:$LIBEVENT_INSTALL_PATH/lib:${LD_LIBRARY_PATH}"
 
 
+# -----------------------------
+# Allow forced rebuild from this point
+# -----------------------------
+COPY .build-timestamp /root/
+
+
 # ------------------------------------------------------------
 # PMIx Install
 # ------------------------------------------------------------
