@@ -34,7 +34,7 @@ RUN yum -y update && \
     autoconf automake libtool flex bison \
     iproute net-tools hwloc make git \
     libnl3 gtk2 atk cairo tcl tcsh tk pciutils lsof ethtool bc file \
-    psmisc && \
+    psmisc valgrind && \
     yum clean all
 
 # ------------------------------------------------------------
@@ -193,7 +193,9 @@ RUN echo "export PMIX_ROOT=/opt/hpc/external/pmix" >> /etc/bashrc && \
     echo "export LD_LIBRARY_PATH=\$PMIX_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
     echo "export LD_LIBRARY_PATH=$HWLOC_INSTALL_PATH/lib:$LIBEVENT_INSTALL_PATH/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
     echo "export LD_LIBRARY_PATH=\$PRRTE_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
-    echo "export PRRTE_MCA_prrte_default_hostfile=$PRRTE_MCA_prrte_default_hostfile" >> /etc/bashrc
+    echo "export PRRTE_MCA_prrte_default_hostfile=$PRRTE_MCA_prrte_default_hostfile" >> /etc/bashrc && \
+    echo "ulimit -c unlimited" >> /etc/bashrc
+    echo "alias pd=pushd >> /etc/bashrc"
 
 # ------------------------------------------------------------
 # Kick off the ssh daemon
