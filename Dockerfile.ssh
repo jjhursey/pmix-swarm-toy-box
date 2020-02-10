@@ -170,12 +170,18 @@ RUN echo '*               hard    core            -1' >> /etc/security/limits.co
 # ------------------------------------------------------------
 # Create a user account
 # ------------------------------------------------------------
-RUN groupadd -r mpiuser && useradd --no-log-init -r -m -b /home -g mpiuser mpiuser
+RUN groupadd -r mpiuser && useradd --no-log-init -r -m -b /home -g mpiuser -G wheel mpiuser
 USER mpiuser
 RUN  cd /home/mpiuser && \
         ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa && chmod og+rX . && \
         cd .ssh && cat id_rsa.pub > authorized_keys && chmod 644 authorized_keys && \
         exit
+
+# ------------------------------------------------------------
+# Give the user passwordless sudo powers
+# ------------------------------------------------------------
+USER root
+RUN echo "mpiuser    ALL = NOPASSWD: ALL" >> /etc/sudoers
 
 # ------------------------------------------------------------
 # Adjust the default environment
@@ -195,7 +201,7 @@ RUN echo "export PMIX_ROOT=/opt/hpc/external/pmix" >> /etc/bashrc && \
     echo "export LD_LIBRARY_PATH=\$PRRTE_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
     echo "export PRRTE_MCA_prrte_default_hostfile=$PRRTE_MCA_prrte_default_hostfile" >> /etc/bashrc && \
     echo "ulimit -c unlimited" >> /etc/bashrc && \
-    echo "alias pd=pushd >> /etc/bashrc"
+    echo "alias pd=pushd" >> /etc/bashrc
 
 # ------------------------------------------------------------
 # Kick off the ssh daemon
