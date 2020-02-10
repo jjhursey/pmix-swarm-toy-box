@@ -99,7 +99,7 @@ startup_container()
     fi
 
     CMD="docker run --rm \
-        --cap-add=SYS_NICE --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
+        --cap-add=SYS_NICE --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --privileged \
         -v $MPI_HOSTFILE:/opt/hpc/etc/hostfile.txt:ro \
         $_OTHER_ARGS \
         --network $OVERLAY_NETWORK \
