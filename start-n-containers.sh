@@ -98,8 +98,24 @@ startup_container()
         _OTHER_ARGS+=" -v $INSTALL_DIR:/opt/hpc/external"
     fi
 
+    # --privileged
+    #   - Needed for debugger support on Mac to set ptrace_scope
+    # Since this setting is "sticky" we can set it before starting the cluster
+    # so we do not need to run the cluster in privileged mode.
+    CMD=(docker run --privileged ${IMAGE_NAME} sh -c "echo 0 > /proc/sys/kernel/yama/ptrace_scope")
+    if [ 0 != $DRYRUN ] ; then
+        echo "${CMD[@]}"
+    else
+        "${CMD[@]}"
+        RTN=$?
+        if [ 0 != $RTN ] ; then
+            echo "Error: Failed to adjust ptrace_scope"
+            exit 1
+        fi
+    fi
+
     CMD="docker run --rm \
-        --cap-add=SYS_NICE --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --privileged \
+        --cap-add=SYS_NICE --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
         -v $MPI_HOSTFILE:/opt/hpc/etc/hostfile.txt:ro \
         $_OTHER_ARGS \
         --network $OVERLAY_NETWORK \
