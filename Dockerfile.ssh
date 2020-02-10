@@ -43,7 +43,7 @@ RUN yum -y update && \
 # - libevent
 # ------------------------------------------------------------
 RUN mkdir -p /opt/hpc/local/build
-ADD src /opt/hpc/local/src
+COPY src /opt/hpc/local/src
 
 ARG LIBEVENT_INSTALL_PATH=/opt/hpc/local/libevent
 ENV LIBEVENT_INSTALL_PATH=$LIBEVENT_INSTALL_PATH
