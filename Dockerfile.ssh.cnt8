@@ -18,7 +18,7 @@
 # - Install directory to mount in an installation directory to be shared between containers
 #   /opt/hpc/external/{pmix,prrte,ompi}
 #
-FROM centos:7
+FROM centos:8
 
 MAINTAINER Josh Hursey <jhursey@us.ibm.com>
 
@@ -27,23 +27,17 @@ MAINTAINER Josh Hursey <jhursey@us.ibm.com>
 # ------------------------------------------------------------
 RUN yum -y update && \
     yum -y install epel-release && \
-    yum -y install centos-release-scl && \
     yum repolist && \
-    yum -y install devtoolset-8 && \
-    yum -y install devtoolset-8-gcc && \
-    yum -y install devtoolset-8-valgrind devtoolset-8-gdb && \
-    yum -y install \
+    yum -y install gcc valgrind gdb \
     openssh-server openssh-clients \
     strace \
     binutils less wget which sudo \
     perl perl-Data-Dumper numactl \
     autoconf automake libtool flex bison \
-    iproute net-tools hwloc make git pandoc \
+    iproute net-tools hwloc make git \
     libnl3 gtk2 atk cairo tcl tcsh tk pciutils lsof ethtool bc file \
-    libpsm2 libpsm2-devel opa-libopamgt opa-libopamgt-devel \
-    libfabric libfabric-devel \
     zlib zlib-devel \
-    python36 python36-devel python36-Cython bzip2 rpm-build && \
+    bzip2 rpm-build && \
     yum clean all
 
 # ------------------------------------------------------------
@@ -80,80 +74,6 @@ ENV LD_LIBRARY_PATH="$HWLOC_INSTALL_PATH/bin:$LIBEVENT_INSTALL_PATH/lib:${LD_LIB
 # Allow forced rebuild from this point
 # -----------------------------
 COPY .build-timestamp /root/
-
-
-# ------------------------------------------------------------
-# PMIx Install
-# ------------------------------------------------------------
-ENV PMIX_ROOT=/opt/hpc/external/pmix
-ENV LD_LIBRARY_PATH="$PMIX_ROOT/lib:${LD_LIBRARY_PATH}"
-
-RUN cd /opt/hpc/local/build && \
-    git clone -q -b master https://github.com/openpmix/openpmix.git && \
-    cd openpmix && \
-    ./autogen.pl && \
-    ./configure --prefix=${PMIX_ROOT} \
-                --with-hwloc=${HWLOC_INSTALL_PATH} \
-                --with-libevent=${LIBEVENT_INSTALL_PATH} 2>&1 | tee configure.log.$$ 2>&1 && \
-    make -j 10 2>&1 | tee make.log.$$ 2>&1 && \
-    make -j 10 install 2>&1 | tee make.install.log.$$ && \
-    cd .. && rm -rf /opt/hpc/local/build/*
-
-# ------------------------------------------------------------
-# PRRTE Install
-# ------------------------------------------------------------
-ENV PRRTE_ROOT=/opt/hpc/external/prrte
-ENV PATH="$PRRTE_ROOT/bin:${PATH}"
-ENV LD_LIBRARY_PATH="$PRRTE_ROOT/lib:${LD_LIBRARY_PATH}"
-
-RUN cd /opt/hpc/local/build && \
-    git clone -q -b master https://github.com/openpmix/prrte.git && \
-    cd prrte && \
-    ./autogen.pl && \
-    ./configure --prefix=${PRRTE_ROOT} \
-                --with-hwloc=${HWLOC_INSTALL_PATH} \
-                --with-libevent=${LIBEVENT_INSTALL_PATH} \
-                --with-pmix=${PMIX_ROOT} 2>&1 | tee configure.log.$$ 2>&1 && \
-    make -j 10 2>&1 | tee make.log.$$ 2>&1 && \
-    make install 2>&1 | tee make.install.log.$$ 2>&1 && \
-    rm -rf /opt/hpc/local/build/*
-
-# ------------------------------------------------------------
-# Open MPI Install
-# ------------------------------------------------------------
-ENV MPI_ROOT=/opt/hpc/external/ompi
-
-ENV PATH="$MPI_ROOT/bin:${PATH}"
-ENV LD_LIBRARY_PATH="$MPI_ROOT/lib:${LD_LIBRARY_PATH}"
-
-ARG _BUILD_OMPI_VERSION=4.0.3
-ENV _BUILD_OMPI_VERSION=${_BUILD_OMPI_VERSION}
-ARG _BUILD_OMPI_BASE_VERSION=4.0
-ENV _BUILD_OMPI_BASE_VERSION=${_BUILD_OMPI_BASE_VERSION}
-
-# Testing a release tarball of OMPI
-RUN cd /opt/hpc/local/build && \
-    wget -q https://download.open-mpi.org/release/open-mpi/v${_BUILD_OMPI_BASE_VERSION}/openmpi-${_BUILD_OMPI_VERSION}.tar.gz && \
-    tar -zxf openmpi-${_BUILD_OMPI_VERSION}.tar.gz  && \
-    cd openmpi-${_BUILD_OMPI_VERSION} && \
-    ./configure --prefix=${MPI_ROOT} \
-                --enable-mpirun-prefix-by-default 2>&1 | tee configure.log.$$ 2>&1 && \
-    make -j 10   2>&1 | tee make.log.$$ 2>&1 && \
-    make install 2>&1 | tee make.install.log.$$ 2>&1
-
-# ------------------------------------------------------------
-# Flush but keep the build directory
-# - We will mount in the pmix/prrte/ompi source in there
-# ------------------------------------------------------------
-RUN rm -rf /opt/hpc/local/build && mkdir -p /opt/hpc/local/build
-
-# ------------------------------------------------------------
-# Copy in an MPI test program
-# ------------------------------------------------------------
-RUN mkdir -p /opt/hpc/examples && chmod og+rwX /opt/hpc/examples && \
-    mkdir -p /opt/hpc/etc && chmod og+rwX /opt/hpc/etc
-COPY tests /opt/hpc/examples
-#RUN cd /opt/hpc/examples && make
 
 
 # ------------------------------------------------------------
@@ -208,17 +128,10 @@ RUN echo "export PMIX_ROOT=/opt/hpc/external/pmix" >> /etc/bashrc && \
     echo "export OMPI_MCA_btl_tcp_if_include=$OMPI_MCA_btl_tcp_if_include" >> /etc/bashrc && \
     echo "ulimit -c unlimited" >> /etc/bashrc && \
     echo "alias pd=pushd" >> /etc/bashrc && \
-    echo "alias ps=\"ps ax -f\"" >> /etc/bashrc && \
-    echo "sudo /usr/sbin/alternatives --install /usr/bin/python python /usr/bin/python2 50" >> /etc/bashrc && \
-    echo "sudo /usr/sbin/alternatives --install /usr/bin/python python /usr/bin/python3.6 40" >> /etc/bashrc
+    echo "alias ps=\"ps ax -f\"" >> /etc/bashrc
 
 # ------------------------------------------------------------
 # Kick off the ssh daemon
 # ------------------------------------------------------------
 EXPOSE 22
 CMD ["/usr/sbin/sshd", "-D"]
-
-USER root
-RUN /usr/sbin/alternatives --install /usr/bin/python python /usr/bin/python2 50 && \
-    /usr/sbin/alternatives --install /usr/bin/python python /usr/bin/python3.6 40
-

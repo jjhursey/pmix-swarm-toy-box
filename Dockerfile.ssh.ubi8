@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi8
+FROM ubuntu
 
 MAINTAINER Josh Hursey <jhursey@us.ibm.com>
 
@@ -10,16 +10,15 @@ MAINTAINER Josh Hursey <jhursey@us.ibm.com>
 #    iproute net-tools hwloc
 #    libnl3 gtk2 atk cairo tcl tcsh tk pciutils lsof ethtool
 # ------------------------------------------------------------
-RUN yum -y update && \
-    yum -y install \
-    gcc gcc-gfortran gcc-c++ gdb \
-    binutils less wget which sudo \
-    perl perl-Data-Dumper \
-    autoconf automake libtool \
-    make git \
-    bc file \
-    diffutils && \
-    yum clean all
+RUN apt-get update && \
+    apt-get -y install gcc gdb && \
+    apt-get -y install binutils less wget sudo && \
+    apt-get -y install perl && \
+    apt-get -y install autoconf automake libtool && \
+    apt-get -y install make git && \
+    apt-get -y install bc file && \
+    apt-get -y install diffutils && \
+    apt-get clean
 
 # ------------------------------------------------------------
 # Define support libraries
@@ -130,7 +129,6 @@ RUN rm -rf /opt/mpi/openmpi-* /opt/mpi/pmix-* /opt/mpi/prrte-*
 RUN mkdir -p /opt/mpi/examples && chmod og+rwX /opt/mpi/examples && \
     mkdir -p /opt/mpi/etc && chmod og+rwX /opt/mpi/etc
 COPY tests /opt/mpi/examples
-RUN cd /opt/mpi/examples && make
 
 
 # ------------------------------------------------------------
