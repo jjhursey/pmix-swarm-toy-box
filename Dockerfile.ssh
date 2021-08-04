@@ -35,6 +35,8 @@ RUN yum -y update && \
     iproute net-tools hwloc make git \
     libnl3 gtk2 atk cairo tcl tcsh tk pciutils lsof ethtool bc file \
     psmisc valgrind && \
+    yum -y install epel-release && \
+    yum -y install pandoc --enablerepo=epel && \
     yum clean all
 
 # ------------------------------------------------------------
