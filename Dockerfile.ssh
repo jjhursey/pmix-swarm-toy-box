@@ -202,6 +202,8 @@ RUN echo "export PMIX_ROOT=/opt/hpc/external/pmix" >> /etc/bashrc && \
     echo "export LD_LIBRARY_PATH=$HWLOC_INSTALL_PATH/lib:$LIBEVENT_INSTALL_PATH/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
     echo "export LD_LIBRARY_PATH=\$PRRTE_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
     echo "export PRRTE_MCA_prrte_default_hostfile=$PRRTE_MCA_prrte_default_hostfile" >> /etc/bashrc && \
+    echo "export LIBEVENT_INSTALL_PATH=/opt/hpc/local/libevent" >> /etc/bashrc && \
+    echo "export HWLOC_INSTALL_PATH=/opt/hpc/local/hwloc" >> /etc/bashrc && \
     echo "ulimit -c unlimited" >> /etc/bashrc && \
     echo "alias pd=pushd" >> /etc/bashrc
 
