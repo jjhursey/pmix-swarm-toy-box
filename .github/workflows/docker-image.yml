@@ -1,0 +1,21 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-centos-7:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Building Centos 7 Docker image
+      run: docker build . --file Dockerfile.ssh --tag pmix-toy-box:centos7-$(date +%s)
+  build-ubi-8:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Building UBI 8 Docker image
+      run: docker build . --file Dockerfile.ssh.ubi8 --tag pmix-toy-box:ubi8-$(date +%s)
