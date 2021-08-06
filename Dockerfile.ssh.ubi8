@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi8
+FROM registry.access.redhat.com/ubi8
 
 MAINTAINER Josh Hursey <jhursey@us.ibm.com>
 
