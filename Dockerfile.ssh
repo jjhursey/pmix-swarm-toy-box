@@ -31,13 +31,25 @@ RUN yum -y update && \
     gcc gcc-gfortran gcc-c++ gdb strace \
     binutils less wget which sudo \
     perl perl-Data-Dumper \
-    autoconf automake libtool flex bison \
+    autoconf automake libtool flex bison python3 \
     iproute net-tools hwloc make git \
     libnl3 gtk2 atk cairo tcl tcsh tk pciutils lsof ethtool bc file \
-    psmisc valgrind && \
+    psmisc valgrind openssl-devel && \
     yum -y install epel-release && \
     yum -y install pandoc --enablerepo=epel && \
     yum clean all
+
+# Setup munge for Slurm's security
+
+#RUN dd if=/dev/urandom bs=1 count=1024 > /etc/munge/munge.key && \
+#    chown munge: /etc/munge/munge.key && \
+#    chmod 400 /etc/munge/munge.key && \
+#    chown -R munge: /etc/munge/ /var/log/munge/ /run/munge /var/lib/munge /var/run/munge && \
+#    chmod 0700 /etc/munge/ /var/log/munge/ /run/munge /var/lib/munge /var/run/munge
+
+#&& \
+    #systemctl enable munge && \
+    #systemctl start  munge
 
 # ------------------------------------------------------------
 # Define support libraries
@@ -51,6 +63,8 @@ ARG LIBEVENT_INSTALL_PATH=/opt/hpc/local/libevent
 ENV LIBEVENT_INSTALL_PATH=$LIBEVENT_INSTALL_PATH
 ARG HWLOC_INSTALL_PATH=/opt/hpc/local/hwloc
 ENV HWLOC_INSTALL_PATH=$HWLOC_INSTALL_PATH
+ARG MUNGE_INSTALL_PATH=/opt/hpc/local/munge
+ENV MUNGE_INSTALL_PATH=$MUNGE_INSTALL_PATH
 
 RUN cd /opt/hpc/local/build && \
     tar -zxf ../src/libevent* && \
@@ -63,10 +77,16 @@ RUN cd /opt/hpc/local/build && \
     cd hwloc-2* && \
     ./configure --prefix=${HWLOC_INSTALL_PATH} > /dev/null && \
     make > /dev/null && \
+    make install > /dev/null 
+RUN cd /opt/hpc/local/build && \
+    tar -xf ../src/munge-* && \
+    cd munge-* && \
+    ./configure --prefix=${MUNGE_INSTALL_PATH} > /dev/null && \
+    make > /dev/null && \
     make install > /dev/null && \
     cd .. && \
     rm -rf /opt/hpc/local/src /opt/hpc/local/build/*
-ENV LD_LIBRARY_PATH="$HWLOC_INSTALL_PATH/bin:$LIBEVENT_INSTALL_PATH/lib:${LD_LIBRARY_PATH}"
+ENV LD_LIBRARY_PATH="$HWLOC_INSTALL_PATH/bin:$LIBEVENT_INSTALL_PATH/lib:$MUNGE_INSTALL_PATH/lib:${LD_LIBRARY_PATH}"
 
 
 # -----------------------------
@@ -81,16 +101,16 @@ COPY .build-timestamp /root/
 ENV PMIX_ROOT=/opt/hpc/external/pmix
 ENV LD_LIBRARY_PATH="$PMIX_ROOT/lib:${LD_LIBRARY_PATH}"
 
-RUN cd /opt/hpc/local/build && \
-    git clone -q -b master https://github.com/openpmix/openpmix.git && \
-    cd openpmix && \
-    ./autogen.pl && \
-    ./configure --prefix=${PMIX_ROOT} \
-                --with-hwloc=${HWLOC_INSTALL_PATH} \
-                --with-libevent=${LIBEVENT_INSTALL_PATH} 2>&1 | tee configure.log.$$ 2>&1 && \
-    make -j 10 2>&1 | tee make.log.$$ 2>&1 && \
-    make -j 10 install 2>&1 | tee make.install.log.$$ && \
-    cd .. && rm -rf /opt/hpc/local/build/*
+#RUN cd /opt/hpc/local/build && \
+#    git clone -q -b master https://github.com/openpmix/openpmix.git && \
+#    cd openpmix && \
+#    ./autogen.pl && \
+#    ./configure --prefix=${PMIX_ROOT} \
+#                --with-hwloc=${HWLOC_INSTALL_PATH} \
+#                --with-libevent=${LIBEVENT_INSTALL_PATH} 2>&1 | tee configure.log.$$ 2>&1 && \
+#    make -j 10 2>&1 | tee make.log.$$ 2>&1 && \
+#    make -j 10 install 2>&1 | tee make.install.log.$$ && \
+#    cd .. && rm -rf /opt/hpc/local/build/*
 
 # ------------------------------------------------------------
 # PRRTE Install
@@ -99,17 +119,17 @@ ENV PRRTE_ROOT=/opt/hpc/external/prrte
 ENV PATH="$PRRTE_ROOT/bin:${PATH}"
 ENV LD_LIBRARY_PATH="$PRRTE_ROOT/lib:${LD_LIBRARY_PATH}"
 
-RUN cd /opt/hpc/local/build && \
-    git clone -q -b master https://github.com/openpmix/prrte.git && \
-    cd prrte && \
-    ./autogen.pl && \
-    ./configure --prefix=${PRRTE_ROOT} \
-                --with-hwloc=${HWLOC_INSTALL_PATH} \
-                --with-libevent=${LIBEVENT_INSTALL_PATH} \
-                --with-pmix=${PMIX_ROOT} 2>&1 | tee configure.log.$$ 2>&1 && \
-    make -j 10 2>&1 | tee make.log.$$ 2>&1 && \
-    make install 2>&1 | tee make.install.log.$$ 2>&1 && \
-    rm -rf /opt/hpc/local/build/*
+#RUN cd /opt/hpc/local/build && \
+#    git clone -q -b master https://github.com/openpmix/prrte.git && \
+#    cd prrte && \
+#    ./autogen.pl && \
+#    ./configure --prefix=${PRRTE_ROOT} \
+#                --with-hwloc=${HWLOC_INSTALL_PATH} \
+#                --with-libevent=${LIBEVENT_INSTALL_PATH} \
+#                --with-pmix=${PMIX_ROOT} 2>&1 | tee configure.log.$$ 2>&1 && \
+#    make -j 10 2>&1 | tee make.log.$$ 2>&1 && \
+#    make install 2>&1 | tee make.install.log.$$ 2>&1 && \
+#    rm -rf /opt/hpc/local/build/*
 
 # ------------------------------------------------------------
 # Open MPI Install
@@ -125,17 +145,17 @@ ARG _BUILD_OMPI_BASE_VERSION=4.0
 ENV _BUILD_OMPI_BASE_VERSION=${_BUILD_OMPI_BASE_VERSION}
 
 # Testing a release tarball of OMPI
-RUN cd /opt/hpc/local/build && \
-    wget -q https://download.open-mpi.org/release/open-mpi/v${_BUILD_OMPI_BASE_VERSION}/openmpi-${_BUILD_OMPI_VERSION}.tar.gz && \
-    tar -zxf openmpi-${_BUILD_OMPI_VERSION}.tar.gz  && \
-    cd openmpi-${_BUILD_OMPI_VERSION} && \
-    ./configure --prefix=${MPI_ROOT} \
-                --with-hwloc=${HWLOC_INSTALL_PATH} \
-                --with-libevent=${LIBEVENT_INSTALL_PATH} \
-                --with-pmix=${PMIX_ROOT} \
-                --enable-mpirun-prefix-by-default 2>&1 | tee configure.log.$$ 2>&1 && \
-    make -j 10   2>&1 | tee make.log.$$ 2>&1 && \
-    make install 2>&1 | tee make.install.log.$$ 2>&1
+#RUN cd /opt/hpc/local/build && \
+#    wget -q https://download.open-mpi.org/release/open-mpi/v${_BUILD_OMPI_BASE_VERSION}/openmpi-${_BUILD_OMPI_VERSION}.tar.gz && \
+#    tar -zxf openmpi-${_BUILD_OMPI_VERSION}.tar.gz  && \
+#    cd openmpi-${_BUILD_OMPI_VERSION} && \
+#    ./configure --prefix=${MPI_ROOT} \
+#                --with-hwloc=${HWLOC_INSTALL_PATH} \
+#                --with-libevent=${LIBEVENT_INSTALL_PATH} \
+#                --with-pmix=${PMIX_ROOT} \
+#                --enable-mpirun-prefix-by-default 2>&1 | tee configure.log.$$ 2>&1 && \
+#    make -j 10   2>&1 | tee make.log.$$ 2>&1 && \
+#    make install 2>&1 | tee make.install.log.$$ 2>&1
 
 # ------------------------------------------------------------
 # Flush but keep the build directory
@@ -149,8 +169,14 @@ RUN rm -rf /opt/hpc/local/build && mkdir -p /opt/hpc/local/build
 RUN mkdir -p /opt/hpc/examples && chmod og+rwX /opt/hpc/examples && \
     mkdir -p /opt/hpc/etc && chmod og+rwX /opt/hpc/etc
 COPY tests /opt/hpc/examples
-RUN cd /opt/hpc/examples && make
+#RUN cd /opt/hpc/examples && make
 
+#
+# Setup munge security for Slurm
+#
+RUN dd if=/dev/urandom bs=1 count=1024 > ${MUNGE_INSTALL_PATH}/etc/munge/munge.key
+RUN chown root: ${MUNGE_INSTALL_PATH}/etc/munge/munge.key
+RUN chmod 400 ${MUNGE_INSTALL_PATH}/etc/munge/munge.key
 
 # ------------------------------------------------------------
 # Fixup the ssh login
@@ -175,6 +201,15 @@ RUN echo '*               hard    core            -1' >> /etc/security/limits.co
 RUN groupadd -r mpiuser && useradd --no-log-init -r -m -b /home -g mpiuser -G wheel mpiuser
 USER mpiuser
 RUN  cd /home/mpiuser && \
+        ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa && chmod og+rX . && \
+        cd .ssh && cat id_rsa.pub > authorized_keys && chmod 644 authorized_keys && \
+        exit
+
+#
+# Need to enable root ssh without password
+#
+USER root
+RUN  cd /root/ && \
         ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa && chmod og+rX . && \
         cd .ssh && cat id_rsa.pub > authorized_keys && chmod 644 authorized_keys && \
         exit
@@ -211,4 +246,7 @@ RUN echo "export PMIX_ROOT=/opt/hpc/external/pmix" >> /etc/bashrc && \
 # Kick off the ssh daemon
 # ------------------------------------------------------------
 EXPOSE 22
+EXPOSE 7002
+EXPOSE 7003
 CMD ["/usr/sbin/sshd", "-D"]
+

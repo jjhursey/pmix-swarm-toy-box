@@ -1,0 +1,25 @@
+ClusterName=DockerCluster
+AuthType=auth/munge
+#Epilog=/usr/local/slurm/etc/epilog
+#JobCompLoc=/var/tmp/jette/slurm.job.log
+#JobCompType=jobcomp/filetxt
+#JobCredentialPrivateKey=/usr/local/etc/slurm.key
+#JobCredentialPublicCertificate=/usr/local/etc/slurm.cert
+#PluginDir=/usr/local/slurm/lib/slurm
+#Prolog=/usr/local/slurm/etc/prolog
+SchedulerType=sched/backfill
+SelectType=select/linear
+SlurmUser=root
+SlurmctldPort=7002
+SlurmctldTimeout=300
+SlurmdPort=7003
+#SlurmdSpoolDir=/var/spool/slurmd.spool
+SlurmdTimeout=300
+#StateSaveLocation=/var/spool/slurm.state
+SwitchType=switch/none
+TreeWidth=50
+
+# The default partition is defined without knowing the hostfile
+PartitionName=DEFAULT State=UP
+
+# Below partition data is automatically generated based on a hostfile
