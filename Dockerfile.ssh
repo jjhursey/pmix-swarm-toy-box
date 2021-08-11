@@ -94,7 +94,6 @@ ENV LD_LIBRARY_PATH="$HWLOC_INSTALL_PATH/bin:$LIBEVENT_INSTALL_PATH/lib:$MUNGE_I
 # -----------------------------
 COPY .build-timestamp /root/
 
-
 # ------------------------------------------------------------
 # PMIx Install
 # ------------------------------------------------------------
@@ -230,7 +229,10 @@ ENV PRRTE_MCA_prrte_default_hostfile=/opt/hpc/etc/hostfile.txt
 RUN echo "export PMIX_ROOT=/opt/hpc/external/pmix" >> /etc/bashrc && \
     echo "export PRRTE_ROOT=/opt/hpc/external/prrte" >> /etc/bashrc  && \
     echo "export MPI_ROOT=/opt/hpc/external/ompi" >> /etc/bashrc  && \
+    echo "export SLURM_ROOT=/opt/hpc/external/slurm" >> /etc/bashrc  && \
     echo "export PATH=\$MPI_ROOT/bin:\$PATH" >> /etc/bashrc  && \
+    echo "export PATH=\$SLURM_ROOT/bin:\$PATH" >> /etc/bashrc  && \
+    echo "export PATH=\$SLURM_ROOT/sbin:\$PATH" >> /etc/bashrc  && \
     echo "export PATH=\$PRRTE_ROOT/bin:\$MPI_ROOT/bin:\$PATH" >> /etc/bashrc  && \
     echo "export LD_LIBRARY_PATH=\$MPI_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
     echo "export LD_LIBRARY_PATH=\$PMIX_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
@@ -246,6 +248,7 @@ RUN echo "export PMIX_ROOT=/opt/hpc/external/pmix" >> /etc/bashrc && \
 # Kick off the ssh daemon
 # ------------------------------------------------------------
 EXPOSE 22
+# Make sure these ports match Slurm defaults or slurm.conf 
 EXPOSE 7002
 EXPOSE 7003
 CMD ["/usr/sbin/sshd", "-D"]
