@@ -18,6 +18,7 @@ cp -a ./bin/slurm-input/slurm.conf.in ./tmp/slurm.conf.initial
 cp -a ./bin/slurm-input/slurm.conf.in ./tmp/slurm.conf.work
 echo "setting up NodeName and PartitionName entries in slurm.conf ..."
 rm ./tmp/hosts
+rm ./tmp/nodes
 HostNumber=1
 while read h; do
 	#echo "NodeName=$h NodeAddr=$h CPUs=${CORES_PER_NODE} State=UNKNOWN" >> ./tmp/slurm.conf.work
