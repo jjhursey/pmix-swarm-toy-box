@@ -233,14 +233,18 @@ RUN echo "export PMIX_ROOT=/opt/hpc/external/pmix" >> /etc/bashrc && \
     echo "export PATH=\$MPI_ROOT/bin:\$PATH" >> /etc/bashrc  && \
     echo "export PATH=\$SLURM_ROOT/bin:\$PATH" >> /etc/bashrc  && \
     echo "export PATH=\$SLURM_ROOT/sbin:\$PATH" >> /etc/bashrc  && \
+    echo "export PATH=\$MUNGE_INSTALL_PATH/bin:\$PATH" >> /etc/bashrc  && \
+    echo "export PATH=\$MUNGE_INSTALL_PATH/sbin:\$PATH" >> /etc/bashrc  && \
     echo "export PATH=\$PRRTE_ROOT/bin:\$MPI_ROOT/bin:\$PATH" >> /etc/bashrc  && \
     echo "export LD_LIBRARY_PATH=\$MPI_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
     echo "export LD_LIBRARY_PATH=\$PMIX_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
-    echo "export LD_LIBRARY_PATH=$HWLOC_INSTALL_PATH/lib:$LIBEVENT_INSTALL_PATH/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
+    echo "export LD_LIBRARY_PATH=\$HWLOC_INSTALL_PATH/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
+    echo "export LD_LIBRARY_PATH=\$LIBEVENT_INSTALL_PATH/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
     echo "export LD_LIBRARY_PATH=\$PRRTE_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
     echo "export PRRTE_MCA_prrte_default_hostfile=$PRRTE_MCA_prrte_default_hostfile" >> /etc/bashrc && \
     echo "export LIBEVENT_INSTALL_PATH=/opt/hpc/local/libevent" >> /etc/bashrc && \
     echo "export HWLOC_INSTALL_PATH=/opt/hpc/local/hwloc" >> /etc/bashrc && \
+    echo "export MUNGE_INSTALL_PATH=/opt/hpc/local/munge" >> /etc/bashrc && \
     echo "ulimit -c unlimited" >> /etc/bashrc && \
     echo "alias pd=pushd" >> /etc/bashrc
 

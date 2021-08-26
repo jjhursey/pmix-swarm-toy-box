@@ -5,8 +5,7 @@ SLURM_INSTALL_DIR=/opt/hpc/external/slurm
 
 while read h; do
 	echo "starting munged in host $h"
-	#ssh $h "${MUNGE_INSTALL_DIR}/sbin/munged -Ff > munge_remote_daemon_out 2>&1" &
-	ssh $h "${MUNGE_INSTALL_DIR}/sbin/munged"
+	ssh $h "${MUNGE_INSTALL_DIR}/sbin/munged" &
 done </opt/hpc/external/slurm/etc/unique_hosts
 
 # make sure the munged daemons have started before we begin starting the slurmds
@@ -14,7 +13,6 @@ sleep 2
 
 while read h; do
 	echo "starting slurmd in host $h"
-	#ssh $h "${SLURM_INSTALL_DIR}/sbin/slurmd -Dc > slurm_remote_daemon_out 2>&1" &
 	ssh $h "${SLURM_INSTALL_DIR}/sbin/slurmd" &
 done </opt/hpc/external/slurm/etc/unique_hosts
 
