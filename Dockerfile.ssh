@@ -247,6 +247,7 @@ RUN echo "export PMIX_ROOT=/opt/hpc/external/pmix" >> /etc/bashrc && \
     echo "export LIBEVENT_INSTALL_PATH=/opt/hpc/local/libevent" >> /etc/bashrc && \
     echo "export HWLOC_INSTALL_PATH=/opt/hpc/local/hwloc" >> /etc/bashrc && \
     echo "export MUNGE_INSTALL_PATH=/opt/hpc/local/munge" >> /etc/bashrc && \
+    echo "export OMPI_MCA_btl_tcp_if_include=eth0" >> /etc/bashrc && \
     echo "ulimit -c unlimited" >> /etc/bashrc && \
     echo "alias pd=pushd" >> /etc/bashrc
 
