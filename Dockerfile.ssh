@@ -34,7 +34,7 @@ RUN yum -y update && \
     autoconf automake libtool flex bison python3 \
     iproute net-tools hwloc make git \
     libnl3 gtk2 atk cairo tcl tcsh tk pciutils lsof ethtool bc file \
-    psmisc valgrind openssl-devel && \
+    psmisc valgrind openssl-devel libfabric && \
     yum -y install epel-release && \
     yum -y install pandoc --enablerepo=epel && \
     yum clean all
@@ -228,9 +228,11 @@ ENV PRRTE_MCA_prrte_default_hostfile=/opt/hpc/etc/hostfile.txt
 # Need to do this so that the 'mpiuser' can have them too, not just root
 RUN echo "export PMIX_ROOT=/opt/hpc/external/pmix" >> /etc/bashrc && \
     echo "export PRRTE_ROOT=/opt/hpc/external/prrte" >> /etc/bashrc  && \
-    echo "export MPI_ROOT=/opt/hpc/external/ompi" >> /etc/bashrc  && \
+    echo "export OMPI_ROOT=/opt/hpc/external/ompi" >> /etc/bashrc  && \
+    echo "export MPICH_ROOT=/opt/hpc/external/mpich" >> /etc/bashrc  && \
     echo "export SLURM_ROOT=/opt/hpc/external/slurm" >> /etc/bashrc  && \
-    echo "export PATH=\$MPI_ROOT/bin:\$PATH" >> /etc/bashrc  && \
+    echo "export PATH=\$OMPI_ROOT/bin:\$PATH" >> /etc/bashrc  && \
+    echo "export PATH=\$MPICH_ROOT/bin:\$PATH" >> /etc/bashrc  && \
     echo "export PATH=\$SLURM_ROOT/bin:\$PATH" >> /etc/bashrc  && \
     echo "export PATH=\$SLURM_ROOT/sbin:\$PATH" >> /etc/bashrc  && \
     echo "export PATH=\$MUNGE_INSTALL_PATH/bin:\$PATH" >> /etc/bashrc  && \
