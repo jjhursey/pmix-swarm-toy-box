@@ -1,6 +1,6 @@
 #!/bin/bash -xe
 
-#./autogen.sh
+./autogen.sh
 ./configure --prefix=${MPICH_ROOT} \
             --with-hwloc=${HWLOC_INSTALL_PATH} \
             --with-pm=no \
