@@ -7,7 +7,16 @@ This assumes that you are using 1 node (your laptop), and do not need to setup a
 
 ## One time setup
 
-Initialize the swarm cluster
+Follow the Docker installation instructions, at:
+https://docs.docker.com/engine/install/ubuntu/
+
+It is recommended to use your own regular user, and not root.  Make sure to add your user to the docker group, as stated in the installation instructions:
+
+```
+usermod -aG docker <user>
+```
+
+Initialize the swarm cluster:
 
 ```
 docker swarm init
@@ -22,6 +31,7 @@ docker swarm init
 Example:
 ```
 shell$ ./build.sh 
+Bulding with Dockerfile.ssh ...
 Sending build context to Docker daemon  12.04MB
 Step 1/38 : FROM centos:7
  ---> 1e1148e4cc2c
@@ -29,6 +39,28 @@ Step 2/38 : MAINTAINER Josh Hursey <jhursey@us.ibm.com>
 ...
 Successfully built 84d26427c5bf
 Successfully tagged ompi-toy-box:latest
+```
+
+The Slurm specific Dockerfile.slurm can be selected for the build:
+
+```
+shell$ ./build.sh slurm 
+Bulding with Dockerfile.slurm ...
+...
+```
+
+For customized build, simply make a copy of one of the Dockerfiles and give it a custom extension.  For example, you can start from the Dockerfile.slurm, by making a copy and renaming it:
+
+```
+cp -a Dockerfile.slurm Dockerfile.foo
+```
+
+You can then update the file, and produce a custom build:
+
+```
+shell$ ./build.sh foo 
+Bulding with Dockerfile.foo ...
+...
 ```
 
 ## Setup your development environment outside the container
@@ -233,3 +265,72 @@ The script (above) creates a shutdown file that can be used to cleanup when you 
 ```
 ./tmp/shutdown-*.sh 
 ```
+
+## Setting up and bootstrapping Slurm 
+
+Similarly to the other tools discussed above, first place the source code of Slurm under the build/ directory:
+
+```
+cd $TOPDIR/build
+git clone git@github.com:SchedMD/slurm.git
+```
+
+Make sure that the Docker cluster has been started with the _start-n-containers.sh_ script as documented above.  A Slurm configuration template and a generator script is provided. These scripts depend on the node information produced by the _start-n-containers.sh_ script.  The _slurm.conf_ file needs to be generated at the host by the normal user (not root), before dropping into the first node:
+
+```
+shell$ cd $TOPDIR
+shell$ ./start-n-containers.sh --install $PWD/install --build $PWD/build -n 4
+Establish network: pmix-net
+Starting: compres-node01
+Starting: compres-node02
+Starting: compres-node03
+Starting: compres-node04
+shell$ ./bin/generate-slurm-conf.sh
+processing the provided hostfile 
+getting unique entries...
+hosts:
+10.0.15.2
+10.0.15.4
+10.0.15.5
+10.0.15.6
+copying initial slurm.conf work file
+setting up NodeName and PartitionName entries in slurm.conf ...
+```
+
+At this point, the cluster has been initialized, and a configuration for Slurm generated dynamically based on the host information.
+
+We can continue by dropping into the first node, becoming root, and builing Slurm:
+
+```
+shell$ ./drop-in.sh
+mpiuser@user-node01$ sudo su
+root@user-node01$
+```
+
+Move to the slurm/ directory and use the provided script to build it.  Please note that Slurm depend on *Mumge*, *hwloc* and *Open PMIx*.  Munge and hwloc are built into the image with the provided Dockerfile.slurm file; however, we recommend that you build the Open PMIx library in the build/ directory.  Please refer to the intructions above.
+
+```
+root@user-node01$ cd /opt/hpc/build/slurm
+root@user-node01$ ../bin/build-slurm.sh
+```
+
+Once Slurm is built and installed, you need to bootstrap the munged and slurmd daemons in all nodes.  The slurmctld daemon needs to be started in the first node only.  For this task, a bootstrap script is provided.  The bootstrap script needs to be run as the *root* user:
+
+```
+root@user-node01$ /opt/hpc/build/bin/bootstrap-slurm.sh
+starting munged in host 10.0.15.2
+starting munged in host 10.0.15.4
+starting munged in host 10.0.15.5
+starting munged in host 10.0.15.6
+starting slurmd in host 10.0.15.2
+starting slurmd in host 10.0.15.4
+starting slurmd in host 10.0.15.5
+starting slurmd in host 10.0.15.6
+starting the controller...
+
+```
+
+At this point, it is recommended to become the *mpiuser* to run or queue jobs in the cluster.  
+
+If the cluster is restarted, the Slurm configuration needs to be regenerated, and the daemons need to be bootstrapped again.  Docker will assign different IPs to the hosts, every time they are launched.
+
