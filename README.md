@@ -49,7 +49,7 @@ Bulding with Dockerfile.slurm ...
 ...
 ```
 
-For customized build, simply make a copy of one of the Dockerfiles and give it a custom extension.  For example, you can start from the Dockerfile.slurm, by making a copy and renaming it:
+For a customized build, simply make a copy of one of the Dockerfiles and give it a custom extension.  For example, you can start from the Dockerfile.slurm, by making a copy and renaming it:
 
 ```
 cp -a Dockerfile.slurm Dockerfile.foo
@@ -268,11 +268,11 @@ The script (above) creates a shutdown file that can be used to cleanup when you 
 
 ## Setting up and bootstrapping Slurm 
 
-Similarly to the other tools discussed above, first place the source code of Slurm under the build/ directory:
+Similarly to the other tools discussed above, in the host, place the source code of Slurm under the _build/_ directory:
 
 ```
-cd $TOPDIR/build
-git clone git@github.com:SchedMD/slurm.git
+shell$ cd $TOPDIR/build
+shell$ git clone git@github.com:SchedMD/slurm.git
 ```
 
 Make sure that the Docker cluster has been started with the _start-n-containers.sh_ script as documented above.  A Slurm configuration template and a generator script is provided. These scripts depend on the node information produced by the _start-n-containers.sh_ script.  The _slurm.conf_ file needs to be generated at the host by the normal user (not root), before dropping into the first node:
@@ -307,14 +307,14 @@ mpiuser@user-node01$ sudo su
 root@user-node01$
 ```
 
-Move to the slurm/ directory and use the provided script to build it.  Please note that Slurm depend on *Mumge*, *hwloc* and *Open PMIx*.  Munge and hwloc are built into the image with the provided Dockerfile.slurm file; however, we recommend that you build the Open PMIx library in the build/ directory.  Please refer to the intructions above.
+Move to the _slurm/_ directory and use the provided script to build it.  Please note that Slurm depends on _Mumge_, _hwloc_ and _Open PMIx_.  _Munge_ and _hwloc_ are built into the image with the provided _Dockerfile.slurm_ file; however, we recommend that you build the _Open PMIx_ library in the build/ directory.  Please refer to the intructions above.
 
 ```
 root@user-node01$ cd /opt/hpc/build/slurm
 root@user-node01$ ../bin/build-slurm.sh
 ```
 
-Once Slurm is built and installed, you need to bootstrap the munged and slurmd daemons in all nodes.  The slurmctld daemon needs to be started in the first node only.  For this task, a bootstrap script is provided.  The bootstrap script needs to be run as the *root* user:
+Once Slurm is built and installed, you need to bootstrap the _munged_ and _slurmd_ daemons in all nodes.  The _slurmctld_ daemon needs to be started in the first node only.  For this task, a bootstrap script is provided.  The bootstrap script needs to be run as the *root* user, once from the first node:
 
 ```
 root@user-node01$ /opt/hpc/build/bin/bootstrap-slurm.sh
@@ -332,5 +332,5 @@ starting the controller...
 
 At this point, it is recommended to become the *mpiuser* to run or queue jobs in the cluster.  
 
-If the cluster is restarted, the Slurm configuration needs to be regenerated, and the daemons need to be bootstrapped again.  Docker will assign different IPs to the hosts, every time they are launched.
+If the cluster is restarted, the Slurm configuration needs to be regenerated, and the daemons need to be bootstrapped again.  Docker will assign different IPs to the hosts every time they are launched.
 
