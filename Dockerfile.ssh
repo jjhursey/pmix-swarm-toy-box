@@ -30,11 +30,11 @@ RUN yum -y update && \
     openssh-server openssh-clients \
     gcc gcc-gfortran gcc-c++ gdb strace \
     binutils less wget which sudo \
-    perl perl-Data-Dumper \
+    perl perl-Data-Dumper numactl \
     autoconf automake libtool flex bison python3 \
     iproute net-tools hwloc make git \
     libnl3 gtk2 atk cairo tcl tcsh tk pciutils lsof ethtool bc file \
-    psmisc valgrind openssl-devel && \
+    psmisc valgrind openssl-devel zlib zlib-devel && \
     yum -y install epel-release && \
     yum -y install pandoc --enablerepo=epel && \
     yum clean all
@@ -220,11 +220,23 @@ USER root
 RUN echo "mpiuser    ALL = NOPASSWD: ALL" >> /etc/sudoers
 
 # ------------------------------------------------------------
+# Add directories required to support rpmbuild
+# ------------------------------------------------------------
+USER mpiuser
+RUN mkdir /home/mpiuser/RPMBUILD /home/mpiuser/RPMBUILD/BUILD \
+          /home/mpiuser/RPMBUILD/RPMS /home/mpiuser/RPMBUILD/SOURCES \
+          /home/mpiuser/RPMBUILD/SPECS /home/mpiuser/RPMBUILD/SRPMS
+
+# ------------------------------------------------------------
 # Adjust the default environment
 # ------------------------------------------------------------
 USER root
 
-ENV PRRTE_MCA_prrte_default_hostfile=/opt/hpc/etc/hostfile.txt
+ENV PRTE_MCA_prrte_default_hostfile=/opt/hpc/etc/hostfile.txt
+ENV OMPI_MCA_btl_tcp_if_include=eth0
+ENV PRTE_MCA_oob_tcp_if_include=eth0
+ENV PMIX_MCA_ptl_base_if_include=eth0
+ENV PATH=$PATH:/opt/hpc/local/hwloc/bin
 # Need to do this so that the 'mpiuser' can have them too, not just root
 RUN echo "export PMIX_ROOT=/opt/hpc/external/pmix" >> /etc/bashrc && \
     echo "export PRRTE_ROOT=/opt/hpc/external/prrte" >> /etc/bashrc  && \
@@ -238,7 +250,10 @@ RUN echo "export PMIX_ROOT=/opt/hpc/external/pmix" >> /etc/bashrc && \
     echo "export LD_LIBRARY_PATH=\$PMIX_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
     echo "export LD_LIBRARY_PATH=$HWLOC_INSTALL_PATH/lib:$LIBEVENT_INSTALL_PATH/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
     echo "export LD_LIBRARY_PATH=\$PRRTE_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
-    echo "export PRRTE_MCA_prrte_default_hostfile=$PRRTE_MCA_prrte_default_hostfile" >> /etc/bashrc && \
+    echo "export PRTE_MCA_prte_default_hostfile=$PRTE_MCA_prte_default_hostfile" >> /etc/bashrc && \
+    echo "export PMIX_MCA_ptl_base_if_include=$PMIX_MCA_ptl_base_if_include" >> /etc/bashrc && \
+    echo "export OMPI_MCA_btl_tcp_if_include=$OMPI_MCA_btl_tcp_if_include" >> /etc/bashrc && \
+    echo "export PRTE_MCA_oob_tcp_if_include=$PRTE_MCA_oob_tcp_if_include" >> /etc/bashrc && \
     echo "export LIBEVENT_INSTALL_PATH=/opt/hpc/local/libevent" >> /etc/bashrc && \
     echo "export HWLOC_INSTALL_PATH=/opt/hpc/local/hwloc" >> /etc/bashrc && \
     echo "ulimit -c unlimited" >> /etc/bashrc && \
