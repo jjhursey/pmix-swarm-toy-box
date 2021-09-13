@@ -1,0 +1,154 @@
+#
+# Base Build box for PRRTE CI
+# Requires:
+#  - Basic compile tooling and runtime support
+#  - libevent
+#  - hwloc 2.x
+# Optional:
+#  - PMIx - built in a location that can be replaced with volume mount
+#    - For now use 'master' branch
+#  - PRRTE - built in a location that can be replaced with volume mount
+#    - For now use 'master' branch
+#  - Open MPI - built in a location that can be replaced with volume mount
+#    - For now use 'master' branch
+#
+# Directory structure for volume mounting
+# - Build directory to mount in the source from the local file system
+#   /opt/hpc/local/build/
+# - Install directory to mount in an installation directory to be shared between containers
+#   /opt/hpc/external/{pmix,prrte,ompi}
+#
+FROM centos:8
+
+MAINTAINER Josh Hursey <jhursey@us.ibm.com>
+
+# ------------------------------------------------------------
+# Install required packages
+# ------------------------------------------------------------
+RUN yum -y update && \
+    yum -y install epel-release && \
+    yum repolist && \
+    yum -y install gcc valgrind gdb \
+    openssh-server openssh-clients \
+    strace \
+    binutils less wget which sudo \
+    perl perl-Data-Dumper numactl \
+    autoconf automake libtool flex bison \
+    iproute net-tools hwloc make git \
+    libnl3 gtk2 atk cairo tcl tcsh tk pciutils lsof ethtool bc file \
+    zlib zlib-devel \
+    bzip2 rpm-build && \
+    yum clean all
+
+# ------------------------------------------------------------
+# Define support libraries
+# - hwloc
+# - libevent
+# ------------------------------------------------------------
+RUN mkdir -p /opt/hpc/local/build
+COPY src /opt/hpc/local/src
+
+ARG LIBEVENT_INSTALL_PATH=/opt/hpc/local/libevent
+ENV LIBEVENT_INSTALL_PATH=$LIBEVENT_INSTALL_PATH
+ARG HWLOC_INSTALL_PATH=/opt/hpc/local/hwloc
+ENV HWLOC_INSTALL_PATH=$HWLOC_INSTALL_PATH
+
+RUN cd /opt/hpc/local/build && \
+    tar -zxf ../src/libevent* && \
+    cd libevent-* && \
+    ./configure --prefix=${LIBEVENT_INSTALL_PATH} > /dev/null && \
+    make > /dev/null && \
+    make install > /dev/null
+RUN cd /opt/hpc/local/build && \
+    tar -zxf ../src/hwloc-2* && \
+    cd hwloc-2* && \
+    ./configure --prefix=${HWLOC_INSTALL_PATH} > /dev/null && \
+    make > /dev/null && \
+    make install > /dev/null && \
+    cd .. && \
+    rm -rf /opt/hpc/local/src /opt/hpc/local/build/*
+ENV LD_LIBRARY_PATH="$HWLOC_INSTALL_PATH/bin:$LIBEVENT_INSTALL_PATH/lib:${LD_LIBRARY_PATH}"
+
+
+# -----------------------------
+# Allow forced rebuild from this point
+# -----------------------------
+COPY .build-timestamp /root/
+
+
+# ------------------------------------------------------------
+# Fixup the ssh login
+# ------------------------------------------------------------
+RUN ssh-keygen -t rsa -f /etc/ssh/ssh_host_rsa_key -N "" && \
+    ssh-keygen -t ecdsa -f /etc/ssh/ssh_host_ecdsa_key  -N "" && \
+    ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key  -N "" && \
+    echo "        LogLevel ERROR" >> /etc/ssh/ssh_config && \
+    echo "        StrictHostKeyChecking no" >> /etc/ssh/ssh_config && \
+    echo "        UserKnownHostsFile=/dev/null" >> /etc/ssh/ssh_config
+
+# ------------------------------------------------------------
+# Adjust default ulimit for core files
+# ------------------------------------------------------------
+RUN echo '*               hard    core            -1' >> /etc/security/limits.conf && \
+    echo '*               soft    core            -1' >> /etc/security/limits.conf && \
+    echo 'ulimit -c unlimited' >> /root/.bashrc
+
+# ------------------------------------------------------------
+# Create a user account
+# ------------------------------------------------------------
+RUN groupadd -r mpiuser && useradd --no-log-init -r -m -b /home -g mpiuser -G wheel mpiuser
+USER mpiuser
+RUN  cd /home/mpiuser && \
+        ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa && chmod og+rX . && \
+        cd .ssh && cat id_rsa.pub > authorized_keys && chmod 644 authorized_keys && \
+        exit
+
+# ------------------------------------------------------------
+# Give the user passwordless sudo powers
+# ------------------------------------------------------------
+USER root
+RUN echo "mpiuser    ALL = NOPASSWD: ALL" >> /etc/sudoers
+
+# ------------------------------------------------------------
+# Add directories required to support rpmbuild
+# ------------------------------------------------------------
+USER mpiuser
+RUN mkdir /home/mpiuser/RPMBUILD /home/mpiuser/RPMBUILD/BUILD \
+          /home/mpiuser/RPMBUILD/RPMS /home/mpiuser/RPMBUILD/SOURCES \
+          /home/mpiuser/RPMBUILD/SPECS /home/mpiuser/RPMBUILD/SRPMS
+
+# ------------------------------------------------------------
+# Adjust the default environment
+# ------------------------------------------------------------
+USER root
+
+ENV PRTE_MCA_prrte_default_hostfile=/opt/hpc/etc/hostfile.txt
+ENV OMPI_MCA_btl_tcp_if_include=eth0
+ENV PRTE_MCA_oob_tcp_if_include=eth0
+ENV PMIX_MCA_ptl_base_if_include=eth0
+ENV PATH=$PATH:/opt/hpc/local/hwloc/bin
+
+# Need to do this so that the 'mpiuser' can have them too, not just root
+RUN echo "export PMIX_ROOT=/opt/hpc/external/pmix" >> /etc/bashrc && \
+    echo "export PRRTE_ROOT=/opt/hpc/external/prrte" >> /etc/bashrc  && \
+    echo "export MPI_ROOT=/opt/hpc/external/ompi" >> /etc/bashrc  && \
+    echo "export PATH=\$MPI_ROOT/bin:/opt/hpc/local/hwloc/bin:\$PATH" >> /etc/bashrc  && \
+    echo "export PATH=\$PRRTE_ROOT/bin:\$MPI_ROOT/bin:\$PATH" >> /etc/bashrc  && \
+    echo "export LD_LIBRARY_PATH=\$MPI_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
+    echo "export LD_LIBRARY_PATH=\$PMIX_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
+    echo "export LD_LIBRARY_PATH=$HWLOC_INSTALL_PATH/lib:$LIBEVENT_INSTALL_PATH/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
+    echo "export LD_LIBRARY_PATH=\$PRRTE_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
+    echo "export PRTE_MCA_prte_default_hostfile=$PRTE_MCA_prte_default_hostfile" >> /etc/bashrc && \
+    echo "export PMIX_MCA_ptl_base_if_include=$PMIX_MCA_ptl_base_if_include" >> /etc/bashrc && \
+    echo "export OMPI_MCA_btl_tcp_if_include=$OMPI_MCA_btl_tcp_if_include" >> /etc/bashrc && \
+    echo "export PRTE_MCA_oob_tcp_if_include=$PRTE_MCA_oob_tcp_if_include" >> /etc/bashrc && \
+    echo "export OMPI_MCA_btl_tcp_if_include=$OMPI_MCA_btl_tcp_if_include" >> /etc/bashrc && \
+    echo "ulimit -c unlimited" >> /etc/bashrc && \
+    echo "alias pd=pushd" >> /etc/bashrc && \
+    echo "alias ps=\"ps ax -f\"" >> /etc/bashrc
+
+# ------------------------------------------------------------
+# Kick off the ssh daemon
+# ------------------------------------------------------------
+EXPOSE 22
+CMD ["/usr/sbin/sshd", "-D"]
