@@ -180,7 +180,7 @@ RUN mkdir /home/mpiuser/RPMBUILD /home/mpiuser/RPMBUILD/BUILD \
 # ------------------------------------------------------------
 USER root
 
-ENV PRTE_MCA_prrte_default_hostfile=/opt/hpc/etc/hostfile.txt
+ENV PRTE_MCA_prte_default_hostfile=/opt/hpc/etc/hostfile.txt
 ENV OMPI_MCA_btl_tcp_if_include=eth0
 ENV PRTE_MCA_oob_tcp_if_include=eth0
 ENV PMIX_MCA_ptl_base_if_include=eth0
