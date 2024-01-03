@@ -1,16 +1,11 @@
 #
-# Base Build box for PRRTE CI
+# Base Build box for Slurm
+#
 # Requires:
 #  - Basic compile tooling and runtime support
 #  - libevent
 #  - hwloc 2.x
-# Optional:
-#  - PMIx - built in a location that can be replaced with volume mount
-#    - For now use 'master' branch
-#  - PRRTE - built in a location that can be replaced with volume mount
-#    - For now use 'master' branch
-#  - Open MPI - built in a location that can be replaced with volume mount
-#    - For now use 'master' branch
+#  - munge
 #
 # Directory structure for volume mounting
 # - Build directory to mount in the source from the local file system
@@ -21,6 +16,7 @@
 FROM centos:7
 
 MAINTAINER Josh Hursey <jhursey@us.ibm.com>
+MAINTAINER Isaias A. Compres U. <isaias.compres@tum.de>
 
 # ------------------------------------------------------------
 # Install required packages
@@ -34,27 +30,16 @@ RUN yum -y update && \
     autoconf automake libtool flex bison python3 \
     iproute net-tools hwloc make git \
     libnl3 gtk2 atk cairo tcl tcsh tk pciutils lsof ethtool bc file \
-    psmisc valgrind openssl-devel zlib zlib-devel && \
+    psmisc valgrind openssl-devel libfabric zlib zlib-devel && \
     yum -y install epel-release && \
     yum -y install pandoc --enablerepo=epel && \
     yum clean all
-
-# Setup munge for Slurm's security
-
-#RUN dd if=/dev/urandom bs=1 count=1024 > /etc/munge/munge.key && \
-#    chown munge: /etc/munge/munge.key && \
-#    chmod 400 /etc/munge/munge.key && \
-#    chown -R munge: /etc/munge/ /var/log/munge/ /run/munge /var/lib/munge /var/run/munge && \
-#    chmod 0700 /etc/munge/ /var/log/munge/ /run/munge /var/lib/munge /var/run/munge
-
-#&& \
-    #systemctl enable munge && \
-    #systemctl start  munge
 
 # ------------------------------------------------------------
 # Define support libraries
 # - hwloc
 # - libevent
+# - munge
 # ------------------------------------------------------------
 RUN mkdir -p /opt/hpc/local/build
 COPY src /opt/hpc/local/src
@@ -95,43 +80,20 @@ ENV LD_LIBRARY_PATH="$HWLOC_INSTALL_PATH/bin:$LIBEVENT_INSTALL_PATH/lib:$MUNGE_I
 COPY .build-timestamp /root/
 
 # ------------------------------------------------------------
-# PMIx Install
+# PMIx Environment
 # ------------------------------------------------------------
 ENV PMIX_ROOT=/opt/hpc/external/pmix
 ENV LD_LIBRARY_PATH="$PMIX_ROOT/lib:${LD_LIBRARY_PATH}"
 
-#RUN cd /opt/hpc/local/build && \
-#    git clone -q -b master https://github.com/openpmix/openpmix.git && \
-#    cd openpmix && \
-#    ./autogen.pl && \
-#    ./configure --prefix=${PMIX_ROOT} \
-#                --with-hwloc=${HWLOC_INSTALL_PATH} \
-#                --with-libevent=${LIBEVENT_INSTALL_PATH} 2>&1 | tee configure.log.$$ 2>&1 && \
-#    make -j 10 2>&1 | tee make.log.$$ 2>&1 && \
-#    make -j 10 install 2>&1 | tee make.install.log.$$ && \
-#    cd .. && rm -rf /opt/hpc/local/build/*
-
 # ------------------------------------------------------------
-# PRRTE Install
+# PRRTE Environment
 # ------------------------------------------------------------
 ENV PRRTE_ROOT=/opt/hpc/external/prrte
 ENV PATH="$PRRTE_ROOT/bin:${PATH}"
 ENV LD_LIBRARY_PATH="$PRRTE_ROOT/lib:${LD_LIBRARY_PATH}"
 
-#RUN cd /opt/hpc/local/build && \
-#    git clone -q -b master https://github.com/openpmix/prrte.git && \
-#    cd prrte && \
-#    ./autogen.pl && \
-#    ./configure --prefix=${PRRTE_ROOT} \
-#                --with-hwloc=${HWLOC_INSTALL_PATH} \
-#                --with-libevent=${LIBEVENT_INSTALL_PATH} \
-#                --with-pmix=${PMIX_ROOT} 2>&1 | tee configure.log.$$ 2>&1 && \
-#    make -j 10 2>&1 | tee make.log.$$ 2>&1 && \
-#    make install 2>&1 | tee make.install.log.$$ 2>&1 && \
-#    rm -rf /opt/hpc/local/build/*
-
 # ------------------------------------------------------------
-# Open MPI Install
+# Open MPI Environment
 # ------------------------------------------------------------
 ENV MPI_ROOT=/opt/hpc/external/ompi
 
@@ -142,19 +104,6 @@ ARG _BUILD_OMPI_VERSION=4.0.3
 ENV _BUILD_OMPI_VERSION=${_BUILD_OMPI_VERSION}
 ARG _BUILD_OMPI_BASE_VERSION=4.0
 ENV _BUILD_OMPI_BASE_VERSION=${_BUILD_OMPI_BASE_VERSION}
-
-# Testing a release tarball of OMPI
-#RUN cd /opt/hpc/local/build && \
-#    wget -q https://download.open-mpi.org/release/open-mpi/v${_BUILD_OMPI_BASE_VERSION}/openmpi-${_BUILD_OMPI_VERSION}.tar.gz && \
-#    tar -zxf openmpi-${_BUILD_OMPI_VERSION}.tar.gz  && \
-#    cd openmpi-${_BUILD_OMPI_VERSION} && \
-#    ./configure --prefix=${MPI_ROOT} \
-#                --with-hwloc=${HWLOC_INSTALL_PATH} \
-#                --with-libevent=${LIBEVENT_INSTALL_PATH} \
-#                --with-pmix=${PMIX_ROOT} \
-#                --enable-mpirun-prefix-by-default 2>&1 | tee configure.log.$$ 2>&1 && \
-#    make -j 10   2>&1 | tee make.log.$$ 2>&1 && \
-#    make install 2>&1 | tee make.install.log.$$ 2>&1
 
 # ------------------------------------------------------------
 # Flush but keep the build directory
@@ -168,7 +117,6 @@ RUN rm -rf /opt/hpc/local/build && mkdir -p /opt/hpc/local/build
 RUN mkdir -p /opt/hpc/examples && chmod og+rwX /opt/hpc/examples && \
     mkdir -p /opt/hpc/etc && chmod og+rwX /opt/hpc/etc
 COPY tests /opt/hpc/examples
-#RUN cd /opt/hpc/examples && make
 
 #
 # Setup munge security for Slurm
@@ -240,15 +188,20 @@ ENV PATH=$PATH:/opt/hpc/local/hwloc/bin
 # Need to do this so that the 'mpiuser' can have them too, not just root
 RUN echo "export PMIX_ROOT=/opt/hpc/external/pmix" >> /etc/bashrc && \
     echo "export PRRTE_ROOT=/opt/hpc/external/prrte" >> /etc/bashrc  && \
-    echo "export MPI_ROOT=/opt/hpc/external/ompi" >> /etc/bashrc  && \
+    echo "export OMPI_ROOT=/opt/hpc/external/ompi" >> /etc/bashrc  && \
+    echo "export MPICH_ROOT=/opt/hpc/external/mpich" >> /etc/bashrc  && \
     echo "export SLURM_ROOT=/opt/hpc/external/slurm" >> /etc/bashrc  && \
-    echo "export PATH=\$MPI_ROOT/bin:\$PATH" >> /etc/bashrc  && \
+    echo "export PATH=\$OMPI_ROOT/bin:\$PATH" >> /etc/bashrc  && \
+    echo "export PATH=\$MPICH_ROOT/bin:\$PATH" >> /etc/bashrc  && \
     echo "export PATH=\$SLURM_ROOT/bin:\$PATH" >> /etc/bashrc  && \
     echo "export PATH=\$SLURM_ROOT/sbin:\$PATH" >> /etc/bashrc  && \
+    echo "export PATH=\$MUNGE_INSTALL_PATH/bin:\$PATH" >> /etc/bashrc  && \
+    echo "export PATH=\$MUNGE_INSTALL_PATH/sbin:\$PATH" >> /etc/bashrc  && \
     echo "export PATH=\$PRRTE_ROOT/bin:\$MPI_ROOT/bin:\$PATH" >> /etc/bashrc  && \
     echo "export LD_LIBRARY_PATH=\$MPI_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
     echo "export LD_LIBRARY_PATH=\$PMIX_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
-    echo "export LD_LIBRARY_PATH=$HWLOC_INSTALL_PATH/lib:$LIBEVENT_INSTALL_PATH/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
+    echo "export LD_LIBRARY_PATH=\$HWLOC_INSTALL_PATH/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
+    echo "export LD_LIBRARY_PATH=\$LIBEVENT_INSTALL_PATH/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
     echo "export LD_LIBRARY_PATH=\$PRRTE_ROOT/lib:\$LD_LIBRARY_PATH" >> /etc/bashrc && \
     echo "export PRTE_MCA_prte_default_hostfile=$PRTE_MCA_prte_default_hostfile" >> /etc/bashrc && \
     echo "export PMIX_MCA_ptl_base_if_include=$PMIX_MCA_ptl_base_if_include" >> /etc/bashrc && \
@@ -256,6 +209,8 @@ RUN echo "export PMIX_ROOT=/opt/hpc/external/pmix" >> /etc/bashrc && \
     echo "export PRTE_MCA_oob_tcp_if_include=$PRTE_MCA_oob_tcp_if_include" >> /etc/bashrc && \
     echo "export LIBEVENT_INSTALL_PATH=/opt/hpc/local/libevent" >> /etc/bashrc && \
     echo "export HWLOC_INSTALL_PATH=/opt/hpc/local/hwloc" >> /etc/bashrc && \
+    echo "export MUNGE_INSTALL_PATH=/opt/hpc/local/munge" >> /etc/bashrc && \
+    echo "export OMPI_MCA_btl_tcp_if_include=eth0" >> /etc/bashrc && \
     echo "ulimit -c unlimited" >> /etc/bashrc && \
     echo "alias pd=pushd" >> /etc/bashrc
 

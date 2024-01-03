@@ -1,0 +1,27 @@
+ClusterName=DockerCluster
+SlurmUser=root
+SlurmctldPort=7002
+SlurmctldTimeout=300
+SlurmctldLogFile=/var/log/slurmctld.log
+SlurmdPort=7003
+SlurmdTimeout=300
+SlurmdLogFile=/var/log/slurmd.log
+TreeWidth=50
+
+# plugin selection
+AuthType=auth/munge
+CredType=cred/munge
+SchedulerType=sched/backfill
+SwitchType=switch/none
+SelectType=select/linear
+ProctrackType=proctrack/linuxproc
+
+# select the Open PMIx plugin
+# Note that this depends on the updated build system (may not be in upstream yet)
+# In this version, there is only one mpi/pmix plugin regardless of the Open PMIx version
+MpiDefault=pmix
+
+# The default partition is defined without knowing the hostfile
+PartitionName=DEFAULT State=UP
+
+# Below partition data is automatically generated based on a hostfile
